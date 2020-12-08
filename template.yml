@@ -1,0 +1,259 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Configure AWS SSO Account Assignment
+
+Parameters: 
+  pAwsSsoInsanceArn: 
+    Type: String
+    Default: 'arn:aws:sso:::instance/ssoins-xxxxx'
+    Description: 'Your AWS SSO Instance ARN.'
+
+# Define Group GUIDs and AWS account IDs
+Mappings: 
+  mGroups:
+    AWSAllAdmin:
+      Id: 'xxxxx-xxxxx-xxxxx-xxxxx-xxxxx'
+    AWSAllReadOnly:
+      Id: 'xxxxx-xxxxx-xxxxx-xxxxx-xxxxx'
+    AWSAccount1Admin:
+      Id: 'xxxxx-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx'
+    AWSAccount1ReadOnly:
+      Id: 'xxxxx-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx'
+    AWSAccount1CodeSuiteRead:
+      Id: 'xxxxx-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx'
+    AWSAccount2Admin:
+      Id: 'xxxxx-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx'
+    AWSAccount2ReadOnly:
+      Id: 'xxxxx-xxxxx-xxxxx-xxxxx-xxxxx-xxxxx'     
+  mAccounts:
+    Account1:
+      Id: '123123123123'
+    Account2:
+      Id: '123123123123'
+
+Resources:
+# Permission Set
+  rPermissionSetOrgAdministratorAccess:
+    Type: AWS::SSO::PermissionSet
+    Properties:
+      Description: 'Permission set being used for AdministratorAccess that bypasses X SCPs'
+      SessionDuration: 'PT12H' # The length of time that the application user sessions are valid for in the ISO-8601 standard.
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      Name: 'FullAdministratorAccess'
+      RelayStateType: 'https://eu-west-1.console.aws.amazon.com/'
+      ManagedPolicies:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+
+  rPermissionSetAdministratorAccess:
+    Type: AWS::SSO::PermissionSet
+    Properties:
+      Description: 'Permission set being used for AdministratorAccess'
+      SessionDuration: 'PT12H' # The length of time that the application user sessions are valid for in the ISO-8601 standard.
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      Name: 'AdministratorAccess'
+      RelayStateType: 'https://eu-west-1.console.aws.amazon.com/'
+      ManagedPolicies:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'      
+
+  rPermissionSetReadOnlyAccess:
+    Type: AWS::SSO::PermissionSet
+    Properties:
+      Description: 'Permission set being used for ReadOnlyAccess'
+      SessionDuration: 'PT12H' # The length of time that the application user sessions are valid for in the ISO-8601 standard.
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      Name: 'ReadOnlyAccess'
+      RelayStateType: 'https://eu-west-1.console.aws.amazon.com/'
+      ManagedPolicies:
+        - 'arn:aws:iam::aws:policy/ReadOnlyAccess'
+
+  rPermissionSetReadCodeSuiteAccess:
+    Type: AWS::SSO::PermissionSet
+    Properties:
+      Description: 'Permission set being used to read AWS CodeSuite services'
+      SessionDuration: 'PT12H' # The length of time that the application user sessions are valid for in the ISO-8601 standard.
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      Name: 'ReadCodeSuite'
+      RelayStateType: 'https://eu-west-1.console.aws.amazon.com/codesuite/home?region=eu-west-1'
+      InlinePolicy: '{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "codecommit:BatchGet*",
+                    "codecommit:BatchDescribe*",
+                    "codecommit:Describe*",
+                    "codecommit:EvaluatePullRequestApprovalRules",
+                    "codecommit:Get*",
+                    "codecommit:List*",
+                    "codecommit:GitPull"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Sid": "CloudWatchEventsCodeCommitRulesReadOnlyAccess",
+                "Effect": "Allow",
+                "Action": [
+                    "events:DescribeRule",
+                    "events:ListTargetsByRule"
+                ],
+                "Resource": "arn:aws:events:*:*:rule/codecommit*"
+            },
+            {
+                "Sid": "SNSSubscriptionAccess",
+                "Effect": "Allow",
+                "Action": [
+                    "sns:ListTopics",
+                    "sns:ListSubscriptionsByTopic",
+                    "sns:GetTopicAttributes"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Sid": "LambdaReadOnlyListAccess",
+                "Effect": "Allow",
+                "Action": [
+                    "lambda:ListFunctions"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Sid": "CodePipelineReadOnlyAccess",
+                "Action": [
+                    "codepipeline:GetPipeline",
+                    "codepipeline:GetPipelineState",
+                    "codepipeline:GetPipelineExecution",
+                    "codepipeline:ListPipelineExecutions",
+                    "codepipeline:ListActionExecutions",
+                    "codepipeline:ListActionTypes",
+                    "codepipeline:ListPipelines",
+                    "codepipeline:ListTagsForResource",
+                    "s3:ListAllMyBuckets"
+                ],
+                "Effect": "Allow",
+                "Resource": "*"
+            },
+            {
+                "Action": [
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:GetBucketPolicy"
+                ],
+                "Effect": "Allow",
+                "Resource": "arn:aws:s3::*:codepipeline-*"
+            },
+            {
+                "Sid": "CodeBuildReadOnlyAccess",
+                "Action": [
+                    "codebuild:BatchGet*",
+                    "codebuild:GetResourcePolicy",
+                    "codebuild:List*",
+                    "codebuild:DescribeTestCases",
+                    "codebuild:DescribeCodeCoverages",
+                    "codecommit:GetBranch",
+                    "codecommit:GetCommit",
+                    "codecommit:GetRepository",
+                    "cloudwatch:GetMetricStatistics",
+                    "events:DescribeRule",
+                    "events:ListTargetsByRule",
+                    "events:ListRuleNamesByTarget",
+                    "logs:GetLogEvents"
+                ],
+                "Effect": "Allow",
+                "Resource": "*"
+            }
+        ]
+    }'
+
+# Account1 Assignments
+  rAllAccount1AdministratorAccess:
+    DependsOn: rPermissionSetOrgAdministratorAccess
+    Type: AWS::SSO::Assignment
+    Properties: 
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      PermissionSetArn: !GetAtt rPermissionSetOrgAdministratorAccess.PermissionSetArn
+      PrincipalId: !FindInMap [ mGroups, AWSAllAdmin, Id ]
+      PrincipalType: 'GROUP'
+      TargetId: !FindInMap [ mAccounts, Account1, Id ]
+      TargetType: 'AWS_ACCOUNT'
+  rAllAccount1ReadOnlyAccess:
+    DependsOn: rPermissionSetReadOnlyAccess
+    Type: AWS::SSO::Assignment
+    Properties: 
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      PermissionSetArn: !GetAtt rPermissionSetReadOnlyAccess.PermissionSetArn
+      PrincipalId: !FindInMap [ mGroups, AWSAllReadOnly, Id ]
+      PrincipalType: 'GROUP'
+      TargetId: !FindInMap [ mAccounts, Account1, Id ]
+      TargetType: 'AWS_ACCOUNT'
+  rAccount1AdministratorAccess:
+    DependsOn: rAllAccount1AdministratorAccess
+    Type: AWS::SSO::Assignment
+    Properties: 
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      PermissionSetArn: !GetAtt rPermissionSetAdministratorAccess.PermissionSetArn
+      PrincipalId: !FindInMap [ mGroups, AWSAccount1Admin, Id ]
+      PrincipalType: 'GROUP'
+      TargetId: !FindInMap [ mAccounts, Account1, Id ]
+      TargetType: 'AWS_ACCOUNT'    
+  rAccount1ReadOnlyAccess:
+    DependsOn: rAllAccount1ReadOnlyAccess
+    Type: AWS::SSO::Assignment
+    Properties: 
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      PermissionSetArn: !GetAtt rPermissionSetReadOnlyAccess.PermissionSetArn
+      PrincipalId: !FindInMap [ mGroups, AWSAccount1ReadOnly, Id ]
+      PrincipalType: 'GROUP'
+      TargetId: !FindInMap [ mAccounts, Account1, Id ]
+      TargetType: 'AWS_ACCOUNT'
+  rAccount1rReadCodeSuiteAccess:
+    DependsOn: rPermissionSetReadCodeSuiteAccess
+    Type: AWS::SSO::Assignment
+    Properties: 
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      PermissionSetArn: !GetAtt rPermissionSetReadCodeSuiteAccess.PermissionSetArn
+      PrincipalId: !FindInMap [ mGroups, AWSAccount1CodeSuiteRead, Id ]
+      PrincipalType: 'GROUP'
+      TargetId: !FindInMap [ mAccounts, Account1, Id ]
+      TargetType: 'AWS_ACCOUNT'
+
+  # Account 2 Assignments    
+  rAllAccount2AdministratorAccess:
+    DependsOn: rAccount1AdministratorAccess
+    Type: AWS::SSO::Assignment
+    Properties: 
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      PermissionSetArn: !GetAtt rPermissionSetOrgAdministratorAccess.PermissionSetArn
+      PrincipalId: !FindInMap [ mGroups, AWSAllAdmin, Id ]
+      PrincipalType: 'GROUP'
+      TargetId: !FindInMap [ mAccounts, Account2, Id ]
+      TargetType: 'AWS_ACCOUNT'
+  rAllAccount2ReadOnlyAccess:
+    DependsOn: rAccount1ReadOnlyAccess
+    Type: AWS::SSO::Assignment
+    Properties: 
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      PermissionSetArn: !GetAtt rPermissionSetReadOnlyAccess.PermissionSetArn
+      PrincipalId: !FindInMap [ mGroups, AWSAllReadOnly, Id ]
+      PrincipalType: 'GROUP'
+      TargetId: !FindInMap [ mAccounts, Account2, Id ]
+      TargetType: 'AWS_ACCOUNT'
+  rAccount2AdministratorAccess:
+    DependsOn: rAllAccount2AdministratorAccess
+    Type: AWS::SSO::Assignment
+    Properties: 
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      PermissionSetArn: !GetAtt rPermissionSetAdministratorAccess.PermissionSetArn
+      PrincipalId: !FindInMap [ mGroups, AWSAccount2Admin, Id ]
+      PrincipalType: 'GROUP'
+      TargetId: !FindInMap [ mAccounts, Account2, Id ]
+      TargetType: 'AWS_ACCOUNT'    
+  rAccount2ReadOnlyAccess:
+    DependsOn: rAllAccount2ReadOnlyAccess
+    Type: AWS::SSO::Assignment
+    Properties: 
+      InstanceArn: !Ref pAwsSsoInsanceArn
+      PermissionSetArn: !GetAtt rPermissionSetReadOnlyAccess.PermissionSetArn
+      PrincipalId: !FindInMap [ mGroups, AWSAccount2ReadOnly, Id ]
+      PrincipalType: 'GROUP'
+      TargetId: !FindInMap [ mAccounts, Account2, Id ]
+      TargetType: 'AWS_ACCOUNT'    
